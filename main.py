@@ -1,17 +1,28 @@
 import sys
 from math import floor
+from time import sleep
+from random import randint
 
 import mmapi
 
 adjlist = [[] for i in range(16)]
 heading = 0
+# brain = []
+stack = []
+exit_route = []
+cheese_route = []
 
-cardinals = {
+CARDINALS = {
     "n": 0,
     "e": 1,
     "s": 2,
     "w": 3,
 }
+# CHEESE = randint(1, 16)
+CHEESE = 6
+
+mmapi.setColor(CHEESE - floor(CHEESE / 4) * 4, floor(CHEESE / 4), "Y")
+mmapi.setText(CHEESE - floor(CHEESE / 4) * 4, floor(CHEESE / 4), "chees")
 
 # I am going with n, e, s, w for each cell
 walls = []
@@ -46,51 +57,62 @@ def log(string):
 # }
 
 
+def turn_heading(target_heading):
+    global heading
+    # log(f"turning {target_heading} from {heading}")
+    if target_heading - heading > 0:
+        for _ in range(target_heading - heading):
+            mmapi.turnRight()
+    else:
+        for _ in range(heading - target_heading):
+            mmapi.turnLeft()
+    heading = target_heading
+
+
 def dfs(c):
+    stack.append(c)
+    if c == 15:
+        for o in stack:
+            exit_route.append(o)
+        log(f"exit {exit_route}")
+    if c == CHEESE:
+        for o in stack:
+            cheese_route.append(o)
+        log(f"cheese route {cheese_route}")
     x = c - floor(c / 4) * 4
     y = floor(c / 4)
     log(f"c {c}, x {x}, y {y}")
-    global heading
-    log(f"h {heading}")
 
     # Scan each wall to get the adjacent nodes
     log(f"cell {walls[y * 4 + x]}")
-
-    for k, v in walls[y * 4 + x].items():
-        if v is None:
-            target_heading = cardinals[k]
-            log(f"idk about {k}, but imma turn to {target_heading}")
-            if target_heading - heading > 0:
-                for i in range(target_heading - heading):
-                    mmapi.turnRight()
-            else:
-                for i in range(heading - target_heading):
-                    mmapi.turnLeft()
-            wall = mmapi.wallFront()
-            walls[c][k] = wall
-            if k == "n":
-                walls[c + 4]["s"] = wall
-            elif k == "s":
-                walls[c - 4]["n"] = wall
-            elif k == "e":
-                walls[c + 1]["w"] = wall
-            elif k == "w":
-                walls[c - 1]["e"] = wall
-
-            if wall:
-                mmapi.setWall(x, y, k)
-                log(f"now i know there is a wall at {x} {y} {k}")
-            else:
-                if k == "n":
-                    adjlist[c].append(c + 4)
-                elif k == "e":
-                    adjlist[c].append(c + 1)
-                elif k == "s":
-                    adjlist[c].append(c - 4)
-                elif k == "w":
-                    adjlist[c].append(c - 1)
-
-            heading = target_heading
+    unknown_walls = [k for k, v in walls[y * 4 + x].items() if v is None]
+    log(f"unknown {unknown_walls}")
+    for w in unknown_walls:
+        target_heading = CARDINALS[w]
+        log(f"idk about {w}, but imma turn to {target_heading}")
+        turn_heading(target_heading)
+        wall = mmapi.wallFront()
+        walls[c][w] = wall
+        if w == "n":
+            walls[c + 4]["s"] = wall
+        elif w == "s":
+            walls[c - 4]["n"] = wall
+        elif w == "e":
+            walls[c + 1]["w"] = wall
+        elif w == "w":
+            walls[c - 1]["e"] = wall
+        if wall:
+            mmapi.setWall(x, y, w)
+            log(f"now i know there is a wall at {x} {y} {w}")
+        else:
+            if w == "n":
+                adjlist[c].append(c + 4)
+            elif w == "e":
+                adjlist[c].append(c + 1)
+            elif w == "s":
+                adjlist[c].append(c - 4)
+            elif w == "w":
+                adjlist[c].append(c - 1)
 
     wallcount = 0
     for w in walls[y * 4 + x].values():
@@ -112,13 +134,7 @@ def dfs(c):
         elif adj - c == -4:  # south
             target_heading = 2
         # log(f"lets go {target_heading}")
-        if target_heading - heading > 0:
-            for i in range(target_heading - heading):
-                mmapi.turnRight()
-        else:
-            for i in range(heading - target_heading):
-                mmapi.turnLeft()
-        heading = target_heading
+        turn_heading(target_heading)
         mmapi.moveForward()
         dfs(adj)
 
@@ -132,20 +148,68 @@ def dfs(c):
         elif adj - c == -4:  # south
             target_heading = 0
         # log(f"lets go {target_heading}")
-        if target_heading - heading > 0:
-            for i in range(target_heading - heading):
-                mmapi.turnRight()
-        else:
-            for i in range(heading - target_heading):
-                mmapi.turnLeft()
-        heading = target_heading
+        turn_heading(target_heading)
         mmapi.moveForward()
+        stack.pop()
+
+
+# def brain_dfs(c):
+#     brain.append(c)
+#     for thing in adjlist[c]:
+#         brain_dfs(thing)
+
+
+def real_run():
+    current_tile = 0
+    log(exit_route)
+    log(cheese_route)
+    # Drive from root to cheese
+    for step in cheese_route[1:]:
+        if step - current_tile == 4:  # Go north
+            turn_heading(0)
+        elif step - current_tile == -4:  # Go south
+            turn_heading(2)
+        elif step - current_tile == 1:  # Go east
+            turn_heading(1)
+        elif step - current_tile == -1:  # Go west !!!
+            turn_heading(3)
+        mmapi.moveForward()
+        current_tile = step
+
+    # Do the thing with exit_route and cheese_route
+    er = exit_route.copy()
+    cr = cheese_route.copy()
+    divergent = 0
+    for a, b in zip(exit_route, cheese_route):
+        # print(a, b)
+        if a == b:
+            er.pop(0)
+            cr.pop(0)
+            divergent += 1
+    get_out = cr[::-1] + [exit_route[divergent - 1]] + er
+    if get_out[0] == CHEESE:
+        get_out.pop(0)
+    log(get_out)
+
+    for step in get_out:
+        if step - current_tile == 4:  # Go north
+            turn_heading(0)
+        elif step - current_tile == -4:  # Go south
+            turn_heading(2)
+        elif step - current_tile == 1:  # Go east
+            turn_heading(1)
+        elif step - current_tile == -1:  # Go west !!!
+            turn_heading(3)
+        mmapi.moveForward()
+        current_tile = step
 
 
 def main():
     dfs(0)
-    log("LET'S GOOOOO")
-    log(adjlist)
+    log("DFS done")
+    turn_heading(0)
+    sleep(1)
+    real_run()
 
 
 if __name__ == "__main__":
