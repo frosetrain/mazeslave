@@ -1,12 +1,13 @@
 import sys
 from math import floor
-from time import sleep
 from random import randint
+from time import sleep
 
 import mmapi
 
 adjlist = [[] for i in range(16)]
 heading = 0
+current_tile = 0
 # brain = []
 stack = []
 exit_route = []
@@ -18,8 +19,8 @@ CARDINALS = {
     "s": 2,
     "w": 3,
 }
-# CHEESE = randint(1, 16)
-CHEESE = 6
+CHEESE = randint(1, 16)
+# CHEESE = 6
 
 mmapi.setColor(CHEESE - floor(CHEESE / 4) * 4, floor(CHEESE / 4), "Y")
 mmapi.setText(CHEESE - floor(CHEESE / 4) * 4, floor(CHEESE / 4), "chees")
@@ -59,26 +60,64 @@ def log(string):
 
 def turn_heading(target_heading):
     global heading
-    # log(f"turning {target_heading} from {heading}")
-    if target_heading - heading > 0:
-        for _ in range(target_heading - heading):
+    log(f"turning {target_heading} from {heading}")
+    real_heading = target_heading
+    if real_heading - heading >= 3:
+        real_heading -= 4
+    if heading - real_heading >= 3:
+        real_heading += 4
+    if real_heading - heading > 0:
+        for _ in range(real_heading - heading):
             mmapi.turnRight()
     else:
-        for _ in range(heading - target_heading):
+        for _ in range(heading - real_heading):
             mmapi.turnLeft()
     heading = target_heading
 
 
+def follow_path(path):
+    log(f"following {path}")
+    global current_tile
+    log(current_tile)
+    for step in path:
+        if step - current_tile == 4:  # Go north
+            log("go north")
+            turn_heading(0)
+        elif step - current_tile == -4:  # Go south
+            log("go south")
+            turn_heading(2)
+        elif step - current_tile == 1:  # Go east
+            log("go east")
+            turn_heading(1)
+        elif step - current_tile == -1:  # Go west !!!
+            log("go west")
+            turn_heading(3)
+        else:
+            current_tile = step
+            continue
+        mmapi.moveForward()
+        current_tile = step
+
+
 def dfs(c):
+    global current_tile
     stack.append(c)
     if c == 15:
         for o in stack:
             exit_route.append(o)
         log(f"exit {exit_route}")
+        if exit_route and cheese_route:  # Go back to the start immediately
+            current_tile = c
+            follow_path(exit_route[-2::-1])
+            return 69  # An exit code the exits the entire recursive dfs stack
     if c == CHEESE:
         for o in stack:
+            current_tile = c
             cheese_route.append(o)
         log(f"cheese route {cheese_route}")
+        if exit_route and cheese_route:  # Go back to the start immediately
+            follow_path(cheese_route[-2::-1])
+            return 69  # An exit code the exits the entire recursive dfs stack
     x = c - floor(c / 4) * 4
     y = floor(c / 4)
     log(f"c {c}, x {x}, y {y}")
@@ -136,7 +175,9 @@ def dfs(c):
         # log(f"lets go {target_heading}")
         turn_heading(target_heading)
         mmapi.moveForward()
-        dfs(adj)
+        rc = dfs(adj)
+        if rc == 69:
+            return 69
 
         # Go back to c
         if adj - c == 1:  # east
@@ -160,21 +201,10 @@ def dfs(c):
 
 
 def real_run():
-    current_tile = 0
     log(exit_route)
     log(cheese_route)
     # Drive from root to cheese
-    for step in cheese_route[1:]:
-        if step - current_tile == 4:  # Go north
-            turn_heading(0)
-        elif step - current_tile == -4:  # Go south
-            turn_heading(2)
-        elif step - current_tile == 1:  # Go east
-            turn_heading(1)
-        elif step - current_tile == -1:  # Go west !!!
-            turn_heading(3)
-        mmapi.moveForward()
-        current_tile = step
+    follow_path(cheese_route[1:])
 
     # Do the thing with exit_route and cheese_route
     er = exit_route.copy()
@@ -190,18 +220,7 @@ def real_run():
     if get_out[0] == CHEESE:
         get_out.pop(0)
     log(get_out)
-
-    for step in get_out:
-        if step - current_tile == 4:  # Go north
-            turn_heading(0)
-        elif step - current_tile == -4:  # Go south
-            turn_heading(2)
-        elif step - current_tile == 1:  # Go east
-            turn_heading(1)
-        elif step - current_tile == -1:  # Go west !!!
-            turn_heading(3)
-        mmapi.moveForward()
-        current_tile = step
+    follow_path(get_out)
 
 
 def main():
