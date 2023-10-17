@@ -8,7 +8,6 @@ import mmapi
 adjlist = [[] for i in range(16)]
 heading = 0
 current_tile = 0
-# brain = []
 stack = []
 exit_route = []
 cheese_route = []
@@ -19,13 +18,13 @@ CARDINALS = {
     "s": 2,
     "w": 3,
 }
-CHEESE = randint(1, 16)
+CHEESE = randint(0, 15)
 # CHEESE = 6
 
 mmapi.setColor(CHEESE - floor(CHEESE / 4) * 4, floor(CHEESE / 4), "Y")
 mmapi.setText(CHEESE - floor(CHEESE / 4) * 4, floor(CHEESE / 4), "chees")
 
-# I am going with n, e, s, w for each cell
+# n, e, s, w for each cell
 walls = []
 for y in range(4):
     for x in range(4):
@@ -49,18 +48,9 @@ def log(string):
     sys.stderr.flush()
 
 
-# void dfs(int x) {
-#     if (visited[x]) return;
-#     visited[x] = true;
-#     for (auto i: adjlist[x]) {
-#         dfs(i);
-#     }
-# }
-
-
 def turn_heading(target_heading):
     global heading
-    log(f"turning {target_heading} from {heading}")
+    # log(f"turning {target_heading} from {heading}")
     real_heading = target_heading
     if real_heading - heading >= 3:
         real_heading -= 4
@@ -78,19 +68,19 @@ def turn_heading(target_heading):
 def follow_path(path):
     log(f"following {path}")
     global current_tile
-    log(current_tile)
+    # log(current_tile)
     for step in path:
         if step - current_tile == 4:  # Go north
-            log("go north")
+            # log("go north")
             turn_heading(0)
         elif step - current_tile == -4:  # Go south
-            log("go south")
+            # log("go south")
             turn_heading(2)
         elif step - current_tile == 1:  # Go east
-            log("go east")
+            # log("go east")
             turn_heading(1)
         elif step - current_tile == -1:  # Go west !!!
-            log("go west")
+            # log("go west")
             turn_heading(3)
         else:
             current_tile = step
@@ -120,15 +110,15 @@ def dfs(c):
             return 69  # An exit code the exits the entire recursive dfs stack
     x = c - floor(c / 4) * 4
     y = floor(c / 4)
-    log(f"c {c}, x {x}, y {y}")
+    # log(f"c {c}, x {x}, y {y}")
 
     # Scan each wall to get the adjacent nodes
-    log(f"cell {walls[y * 4 + x]}")
+    # log(f"cell {walls[y * 4 + x]}")
     unknown_walls = [k for k, v in walls[y * 4 + x].items() if v is None]
-    log(f"unknown {unknown_walls}")
+    # log(f"unknown {unknown_walls}")
     for w in unknown_walls:
         target_heading = CARDINALS[w]
-        log(f"idk about {w}, but imma turn to {target_heading}")
+        # log(f"idk about {w}, but imma turn to {target_heading}")
         turn_heading(target_heading)
         wall = mmapi.wallFront()
         walls[c][w] = wall
@@ -142,7 +132,7 @@ def dfs(c):
             walls[c - 1]["e"] = wall
         if wall:
             mmapi.setWall(x, y, w)
-            log(f"now i know there is a wall at {x} {y} {w}")
+            # log(f"now i know there is a wall at {x} {y} {w}")
         else:
             if w == "n":
                 adjlist[c].append(c + 4)
@@ -158,7 +148,7 @@ def dfs(c):
         if w is True:
             wallcount += 1
     if wallcount == 3 and c != 0:
-        log("We have reached a ded end!! Yay")
+        # log("We have reached a ded end!! Yay")
         return
 
     log(adjlist[c])
@@ -192,12 +182,6 @@ def dfs(c):
         turn_heading(target_heading)
         mmapi.moveForward()
         stack.pop()
-
-
-# def brain_dfs(c):
-#     brain.append(c)
-#     for thing in adjlist[c]:
-#         brain_dfs(thing)
 
 
 def real_run():
