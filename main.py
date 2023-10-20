@@ -1,7 +1,9 @@
 from math import floor
 from time import sleep
-import mbot2, event
-from cyberpi import ultrasonic2, quad_rgb_sensor, stop_all, console
+
+import event
+import mbot2
+from cyberpi import console, quad_rgb_sensor, stop_all, ultrasonic2
 
 adjlist = [[] for i in range(16)]
 heading = 0
@@ -132,9 +134,7 @@ def follow_path(path):
 
 
 def fake_dfs(c):
-    log(
-        "asddsjfdsklsdjlfdjfklasjfd"
-    )
+    log("asddsjfdsklsdjlfdjfklasjfd")
     global cheese_route
     global exit_route
     global dfs_done
@@ -159,7 +159,7 @@ def dfs(c):
     global dfs_done
     stack.append(c)
     if c == end:
-        possible_ends = { "s": False, "n": False, "w": False, "e": False }
+        possible_ends = {"s": False, "n": False, "w": False, "e": False}
         if end_y == 0:
             cell["s"] = True
         elif end_y == 3:
@@ -379,4 +379,3 @@ def on_press_b():
     global dfs_done
     mbot2.EM_stop()
     stop_all()
-
