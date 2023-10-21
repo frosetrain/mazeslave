@@ -3,7 +3,7 @@ from time import sleep
 
 import event
 import mbot2
-from cyberpi import console, quad_rgb_sensor, stop_all, ultrasonic2
+from cyberpi import console, quad_rgb_sensor, stop_all, ultrasonic2, led
 
 adjlist = [[] for i in range(16)]
 heading = 0
@@ -18,6 +18,7 @@ end_y = None
 cheese = None
 end = None
 end_opening = None
+start = None
 
 dfs_done = False
 
@@ -44,7 +45,7 @@ for y in range(4):
         walls.append(cell)
 
 
-def linetrack_forward(stop_at_junction=True):
+def linetrack_forward():
     quad_rgb_sensor.set_led(color="white")
     while True:
         r1 = (100 - quad_rgb_sensor.get_light(1)) / 100
@@ -58,13 +59,10 @@ def linetrack_forward(stop_at_junction=True):
             if val > 0.4:
                 blacks += 1
         if blacks >= 3:
-            if stop_at_junction:
-                mbot2.EM_stop()
-                # log("JUNCTION")
-                mbot2.straight(8)
-                mbot2.EM_stop()
-            else:
-                mbot2.straight(5)
+            mbot2.EM_stop()
+            # log("JUNCTION")
+            mbot2.straight(8)
+            mbot2.EM_stop()
             return
         mbot2.drive_speed(oof * -15 + 50, oof * -15 - 50)
 
@@ -124,12 +122,9 @@ def follow_path(path):
         else:
             current_tile = step
             continue
-        if heading != new_heading:
-            turn_heading(new_heading)
-            heading = new_heading
-            linetrack_forward()
-        else:
-            linetrack_forward(False)
+        turn_heading(new_heading)
+        heading = new_heading
+        linetrack_forward()
         current_tile = step
 
 
@@ -161,13 +156,13 @@ def dfs(c):
     if c == end:
         possible_ends = {"s": False, "n": False, "w": False, "e": False}
         if end_y == 0:
-            cell["s"] = True
+            possible_ends["s"] = True
         elif end_y == 3:
-            cell["n"] = True
+            possible_ends["n"] = True
         if end_x == 0:
-            cell["w"] = True
+            possible_ends["w"] = True
         elif end_x == 3:
-            cell["e"] = True
+            possible_ends["e"] = True
         for direction, possible in possible_ends.items():
             if possible:
                 target_heading = CARDINALS[direction]
@@ -178,25 +173,28 @@ def dfs(c):
                     end_opening = direction
                     log("opening at " + end_opening)
                 mbot2.straight(2)
-
-        walls.append(cell)
-
         for o in stack:
             exit_route.append(o)
         # log(f"exit {exit_route}")
         if exit_route and cheese_route:  # Go back to the start immediately
-            current_tile = c
             dfs_done = True
             log("dfs done")
             # follow_path(exit_route[-2::-1])
             return 69  # An exit code the exits the entire recursive dfs stack
     if c == cheese:
+        led.on("yellow")
+        sleep(0.5)
+        led.on("green", id=1)
+        led.on("black", id=2)
+        led.on("white", id=3)
+        led.on("black", id=4)
+        led.on("green", id=5)
         for o in stack:
-            current_tile = c
             cheese_route.append(o)
         # log(f"cheese route {cheese_route}")
         if exit_route and cheese_route:  # Go back to the start immediately
-            follow_path(cheese_route[-2::-1])
+            dfs_done = True
+            log("dfs done")
             return 69  # An exit code the exits the entire recursive dfs stack
     x = c - floor(c / 4) * 4
     y = floor(c / 4)
@@ -282,7 +280,7 @@ def real_run():
     global cheese_route
     global walls
     global end_opening
-    current_tile = 0
+    current_tile = start
     heading = 0
 
     log("final er" + str(exit_route))
@@ -307,7 +305,7 @@ def real_run():
     follow_path(get_out)
     log(end_opening)
     turn_heading(CARDINALS[end_opening])
-    mbot2.straight(50)
+    mbot2.straight(100)
 
 
 def enter_value(val):
@@ -317,6 +315,7 @@ def enter_value(val):
     global end_x
     global end_y
     global end
+    global start
     log(str(val))
     if cheese is None:
         if cheese_x is None:
@@ -332,6 +331,11 @@ def enter_value(val):
             end_y = val
             end = end_y * 4 + end_x
             log("end " + str(end))
+    elif start is None:
+        start = val
+        log("start " + str(start))
+        sleep(1)
+        dfs(start)
 
 
 @event.is_press("up")
@@ -362,16 +366,10 @@ def main():
     global end_opening
     # end_opening = "n"
     quad_rgb_sensor.set_led(color="white")
-    if cheese is None or end is None:
-        log("SPECIFY CHEESE AND/OR END!!! you idiot")
     # cheese_route = [0, 1]
     # exit_route = [0, 1, 5, 4, 8, 12]
     # real_run()
-    if not dfs_done:
-        dfs(0)
-        turn_heading(0)
-    else:
-        real_run()
+    real_run()
 
 
 @event.is_press("b")
@@ -379,3 +377,12 @@ def on_press_b():
     global dfs_done
     mbot2.EM_stop()
     stop_all()
+
+
+@event.start
+def on_start():
+    led.on("green", id=1)
+    led.on("black", id=2)
+    led.on("white", id=3)
+    led.on("black", id=4)
+    led.on("green", id=5)
